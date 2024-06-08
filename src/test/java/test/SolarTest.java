@@ -48,7 +48,7 @@ public class SolarTest {
 
   @Test
   public void test10(){
-    Assert.assertFalse(SolarUtil.isLeapYear(1500));
+    Assert.assertTrue(SolarUtil.isLeapYear(1500));
   }
 
   @Test
@@ -169,6 +169,30 @@ public class SolarTest {
   public void test26(){
     Solar solar = new Solar(1582, 10, 15);
     Assert.assertEquals("1582-09-29", solar.next(-6).toYmd());
+  }
+
+  @Test
+  public void test27(){
+    Solar solar = Solar.fromYmd(2023, 8, 31);
+    Assert.assertEquals("2023-09-30", solar.nextMonth(1).toYmd());
+  }
+
+  @Test
+  public void test28(){
+    Solar solar = Solar.fromYmd(2023, 8, 31);
+    Assert.assertEquals("2023-10-31", solar.nextMonth(2).toYmd());
+  }
+
+  @Test
+  public void test29(){
+    Solar solar = Solar.fromYmd(2023, 8, 31);
+    Assert.assertEquals("2025-08-31", solar.nextYear(2).toYmd());
+  }
+
+  @Test
+  public void test30(){
+    Solar solar = Solar.fromYmd(2023, 8, 31);
+    Assert.assertEquals("2024-02-29", solar.nextMonth(6).toYmd());
   }
 
 }

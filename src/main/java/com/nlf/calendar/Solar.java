@@ -186,6 +186,10 @@ public class Solar {
       minute -= 60;
       hour++;
     }
+    if (hour > 23) {
+      hour -= 24;
+      day += 1;
+    }
     this.year = year;
     this.month = month;
     this.day = day;
@@ -292,49 +296,72 @@ public class Solar {
   public static List<Solar> fromBaZi(String yearGanZhi, String monthGanZhi, String dayGanZhi, String timeGanZhi, int sect, int baseYear) {
     sect = (1 == sect) ? 1 : 2;
     List<Solar> l = new ArrayList<Solar>();
-    List<Integer> years = new ArrayList<Integer>();
-    Solar today = fromDate(new Date());
-    int offsetYear = LunarUtil.getJiaZiIndex(today.getLunar().getYearInGanZhiExact())-LunarUtil.getJiaZiIndex(yearGanZhi);
-    if(offsetYear < 0){
-      offsetYear += 60;
+    // 月地支距寅月的偏移值
+    int m = LunarUtil.find(monthGanZhi.substring(1), LunarUtil.ZHI, -1) - 2;
+    if (m < 0) {
+      m += 12;
     }
-    int startYear = today.getYear() - offsetYear - 1;
-    int minYear = baseYear - 2;
-    while (startYear >= minYear) {
-      years.add(startYear);
-      startYear -= 60;
+    // 月天干要一致
+    if (((LunarUtil.find(yearGanZhi.substring(0, 1), LunarUtil.GAN, -1) + 1) * 2 + m) % 10 != LunarUtil.find(monthGanZhi.substring(0, 1), LunarUtil.GAN, -1)) {
+      return l;
     }
-    List<Integer> hours = new ArrayList<Integer>(2);
-    String timeZhi = timeGanZhi.substring(1);
-    for(int i = 1, j = LunarUtil.ZHI.length; i < j; i++){
-      if(LunarUtil.ZHI[i].equals(timeZhi)){
-        hours.add((i - 1) * 2);
-        break;
-      }
+    // 1年的立春是辛酉，序号57
+    int y = LunarUtil.getJiaZiIndex(yearGanZhi) - 57;
+    if (y < 0) {
+      y += 60;
     }
-    if ("子".equals(timeZhi)) {
-      hours.add(23);
+    y++;
+    // 节令偏移值
+    m *= 2;
+    // 时辰地支转时刻，子时按零点算
+    int h = LunarUtil.find(timeGanZhi.substring(1), LunarUtil.ZHI, -1) * 2;
+    int[] hours = {h};
+    if (0 == h && 2 == sect) {
+      hours = new int[]{0, 23};
     }
-    for (int hour: hours) {
-      for (Integer y : years) {
-        int maxYear = y + 3;
-        int year = y;
-        int month = 11;
-        if (year < baseYear) {
-          year = baseYear;
-          month = 1;
-        }
-        Solar solar = fromYmdHms(year, month, 1, hour, 0, 0);
-        while (solar.getYear() <= maxYear) {
-          Lunar lunar = solar.getLunar();
-          String dgz = (2 == sect) ? lunar.getDayInGanZhiExact2() : lunar.getDayInGanZhiExact();
-          if (lunar.getYearInGanZhiExact().equals(yearGanZhi) && lunar.getMonthInGanZhiExact().equals(monthGanZhi) && dgz.equals(dayGanZhi) && lunar.getTimeInGanZhi().equals(timeGanZhi)) {
-            l.add(solar);
-            break;
+    int startYear = baseYear - 1;
+
+    // 结束年
+    Calendar c = Calendar.getInstance(TIME_ZONE);
+    c.setTime(new Date());
+    c.set(Calendar.MILLISECOND, 0);
+    int endYear = c.get(Calendar.YEAR);
+
+    while (y <= endYear) {
+      if (y >= startYear) {
+        // 立春为寅月的开始
+        List<Solar> jieQiList = new ArrayList<Solar>(Lunar.fromYmd(y, 1, 1).getJieQiTable().values());
+        // 节令推移，年干支和月干支就都匹配上了
+        Solar solarTime = jieQiList.get(4 + m);
+        if (solarTime.getYear() >= baseYear) {
+          // 日干支和节令干支的偏移值
+          int d = LunarUtil.getJiaZiIndex(dayGanZhi) - LunarUtil.getJiaZiIndex(solarTime.getLunar().getDayInGanZhiExact2());
+          if (d < 0) {
+            d += 60;
           }
-          solar = solar.next(1);
+          if (d > 0) {
+            // 从节令推移天数
+            solarTime = solarTime.next(d);
+          }
+          for (int hour : hours) {
+            int mi = 0;
+            int s = 0;
+            if (d == 0 && hour == solarTime.getHour()) {
+              // 如果正好是节令当天，且小时和节令的小时数相等的极端情况，把分钟和秒钟带上
+              mi = solarTime.getMinute();
+              s = solarTime.getSecond();
+            }
+            // 验证一下
+            Solar solar = Solar.fromYmdHms(solarTime.getYear(), solarTime.getMonth(), solarTime.getDay(), hour, mi, s);
+            Lunar lunar = solar.getLunar();
+            String dgz = (2 == sect) ? lunar.getDayInGanZhiExact2() : lunar.getDayInGanZhiExact();
+            if (lunar.getYearInGanZhiExact().equals(yearGanZhi) && lunar.getMonthInGanZhiExact().equals(monthGanZhi) && dgz.equals(dayGanZhi) && lunar.getTimeInGanZhi().equals(timeGanZhi)) {
+              l.add(solar);
+            }
+          }
         }
       }
+      y += 60;
     }
     return l;
   }
@@ -354,26 +381,7 @@ public class Solar {
    * @return 0123456
    */
   public int getWeek() {
-    Solar start = fromYmd(1582, 10, 15);
-    int y = year;
-    int m = month;
-    int d = day;
-    Solar current = fromYmd(y, m, d);
-    // 蔡勒公式
-    if (m < 3) {
-      m += 12;
-      y--;
-    }
-    int c = y / 100;
-    y = y - c * 100;
-    int x = y + y / 4 + c / 4 - 2 * c;
-    int w;
-    if (current.isBefore(start)) {
-      w = (x + 13 * (m + 1) / 5 + d + 2) % 7;
-    } else {
-      w = (x + 26 * (m + 1) / 10 + d - 1) % 7;
-    }
-    return (w + 7) % 7;
+    return ((int) (getJulianDay() + 0.5) + 7000001) % 7;
   }
 
   /**
@@ -598,6 +606,7 @@ public class Solar {
 
   /**
    * 阳历日期相减，获得相差天数
+   *
    * @param solar 阳历
    * @return 天数
    */
@@ -607,6 +616,7 @@ public class Solar {
 
   /**
    * 阳历日期相减，获得相差分钟数
+   *
    * @param solar 阳历
    * @return 分钟数
    */
@@ -625,6 +635,7 @@ public class Solar {
 
   /**
    * 是否在指定日期之后
+   *
    * @param solar 阳历
    * @return true/false
    */
@@ -664,6 +675,7 @@ public class Solar {
 
   /**
    * 是否在指定日期之前
+   *
    * @param solar 阳历
    * @return true/false
    */
@@ -703,6 +715,7 @@ public class Solar {
 
   /**
    * 年推移
+   *
    * @param years 年数
    * @return 阳历
    */
@@ -710,17 +723,15 @@ public class Solar {
     int y = year + years;
     int m = month;
     int d = day;
-    // 2月处理
-    if (2 == m) {
+    if (1582 == y && 10 == m) {
+      if (d > 4 && d < 15) {
+        d += 10;
+      }
+    } else if (2 == m) {
       if (d > 28) {
         if (!SolarUtil.isLeapYear(y)) {
           d = 28;
         }
-      }
-    }
-    if (1582 == y && 10 == m) {
-      if (d > 4 && d < 15) {
-        d += 10;
       }
     }
     return fromYmdHms(y, m, d, hour, minute, second);
@@ -728,6 +739,7 @@ public class Solar {
 
   /**
    * 月推移
+   *
    * @param months 月数
    * @return 阳历
    */
@@ -736,17 +748,14 @@ public class Solar {
     int y = month.getYear();
     int m = month.getMonth();
     int d = day;
-    // 2月处理
-    if (2 == m) {
-      if (d > 28) {
-        if (!SolarUtil.isLeapYear(y)) {
-          d = 28;
-        }
-      }
-    }
     if (1582 == y && 10 == m) {
       if (d > 4 && d < 15) {
         d += 10;
+      }
+    } else {
+      int maxDay = SolarUtil.getDaysOfMonth(y, m);
+      if (d > maxDay) {
+        d = maxDay;
       }
     }
     return fromYmdHms(y, m, d, hour, minute, second);
@@ -791,7 +800,7 @@ public class Solar {
       d += days;
     }
     if (1582 == y && 10 == m) {
-      if (d > 4 ) {
+      if (d > 4) {
         d += 10;
       }
     }
@@ -806,7 +815,7 @@ public class Solar {
    * @return 阳历日期
    */
   public Solar next(int days, boolean onlyWorkday) {
-    if(!onlyWorkday) {
+    if (!onlyWorkday) {
       return next(days);
     }
     Solar solar = fromYmdHms(year, month, day, hour, minute, second);
@@ -835,6 +844,7 @@ public class Solar {
 
   /**
    * 小时推移
+   *
    * @param hours 小时数
    * @return 阳历
    */
@@ -852,4 +862,55 @@ public class Solar {
     return fromYmdHms(solar.getYear(), solar.getMonth(), solar.getDay(), hour, solar.getMinute(), solar.getSecond());
   }
 
+  /**
+   * 获取薪资比例(感谢 https://gitee.com/smr1987)
+   *
+   * @return 薪资比例：1/2/3
+   */
+  public int getSalaryRate() {
+    // 元旦节
+    if (month == 1 && day == 1) {
+      return 3;
+    }
+    // 劳动节
+    if (month == 5 && day == 1) {
+      return 3;
+    }
+    // 国庆
+    if (month == 10 && day >= 1 && day <= 3) {
+      return 3;
+    }
+    Lunar lunar = getLunar();
+    // 春节
+    if (lunar.getMonth() == 1 && lunar.getDay() >= 1 && lunar.getDay() <= 3) {
+      return 3;
+    }
+    // 端午
+    if (lunar.getMonth() == 5 && lunar.getDay() == 5) {
+      return 3;
+    }
+    // 中秋
+    if (lunar.getMonth() == 8 && lunar.getDay() == 15) {
+      return 3;
+    }
+    // 清明
+    if ("清明".equals(lunar.getJieQi())) {
+      return 3;
+    }
+    Holiday holiday = HolidayUtil.getHoliday(year, month, day);
+    if (null != holiday) {
+      // 法定假日非上班
+      if (!holiday.isWork()) {
+        return 2;
+      }
+    } else {
+      // 周末
+      int week = getWeek();
+      if (week == 6 || week == 0) {
+        return 2;
+      }
+    }
+    // 工作日
+    return 1;
+  }
 }
