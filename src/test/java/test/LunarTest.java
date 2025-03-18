@@ -650,4 +650,32 @@ public class LunarTest {
     Assert.assertEquals("闭", lunar.getZhiXing());
   }
 
+  @Test
+  public void test96() {
+    Lunar lunar = Solar.fromYmd(2025, 2, 7).getLunar();
+    Assert.assertEquals("[嫁娶, 祭祀, 祈福, 出行, 解除, 出火, 拆卸, 动土, 入宅, 移徙, 安床, 上梁, 栽种, 纳畜, 破土, 启钻, 安葬]", lunar.getDayYi().toString());
+    Assert.assertEquals("[开市, 立券, 理发, 作灶]", lunar.getDayJi().toString());
+  }
+
+  @Test
+  public void test97() {
+    Lunar lunar = Solar.fromYmd(2025, 3, 5).getLunar();
+    Assert.assertEquals("[破屋, 坏垣, 求医, 治病]", lunar.getDayYi().toString());
+    Assert.assertEquals("[诸事不宜]", lunar.getDayJi().toString());
+  }
+
+  @Test
+  public void test98() {
+    Lunar lunar = Solar.fromYmd(2025, 5, 3).getLunar();
+    Assert.assertEquals("[祭祀, 祈福, 求嗣, 斋醮, 沐浴, 纳畜, 入殓, 破土, 安葬]", lunar.getDayYi().toString());
+    Assert.assertEquals("[移徙, 入宅, 嫁娶, 出行, 安床]", lunar.getDayJi().toString());
+  }
+
+  @Test
+  public void test99() {
+    Lunar lunar = Solar.fromYmd(2025, 5, 4).getLunar();
+    Assert.assertEquals("[纳采, 祭祀, 祈福, 求嗣, 斋醮, 出行, 起基, 盖屋, 定磉, 安门, 入殓, 安葬]", lunar.getDayYi().toString());
+    Assert.assertEquals("[嫁娶, 开市, 纳财, 出火]", lunar.getDayJi().toString());
+  }
+
 }
